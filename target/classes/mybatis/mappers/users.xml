@@ -1,0 +1,81 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="users">
+
+	<insert id="joinUser" parameterType="userVo">
+		<selectKey keyProperty="no" resultType="int" order="BEFORE">
+				select seq_users_no.nextval from dual 
+		</selectKey>
+		insert all
+		into users
+		values(	#{no}, 
+		        #{id}, 
+		        #{pw},
+		        #{name},
+		        #{email},
+		        #{phone},
+		        #{address}||','||#{address_detail},
+		        #{gender},
+		        #{birth},
+		        '',
+		        '',
+		        ''
+		)
+		into car
+		values (
+			seq_car_no.nextval,
+			#{no},
+			'',
+			'',
+			'',
+			'',
+			'',
+			''
+		)
+		select * from dual
+	</insert>
+	
+	<select id="loginOk" parameterType="userVo" resultType="userVo">
+		select u.no no
+				,id
+			   ,u.name name
+			   ,c.no carNo
+		from users u, car c
+		where u.no = c.userNo
+		and id = #{id}
+		and pw = #{pw}
+	</select>
+	
+	<select id="idChk" parameterType="String" resultType="int">
+		select count(*)
+		from users
+		where id = #{id}
+	</select>
+	
+	<select id="getUserInfo" parameterType="int" resultType="userVo">
+		select name,
+			gender,
+			birth
+		from users
+		where no = #{userNo}
+	</select>
+	
+	<select id="kakaoLogin" parameterType="hashmap" resultType="userVo">
+		select u.no no
+				,id
+			   ,u.name name
+			   ,c.no carNo
+		from users u, car c
+		where u.no = c.userNo
+		and u.name = #{nickname}
+		and kakaoEmail = #{email}
+	</select>
+	
+	<update id="insertKakao" parameterType="map">
+		update users
+		set kakaoEmail = #{email}
+		where no = #{userNo}
+	</update>
+
+</mapper>

@@ -1,0 +1,1148 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="mypageR">
+
+
+	<insert id="InsertQna" parameterType="com.spotmate.vo.myQnaVo">
+
+		<![CDATA[
+		
+			insert into myqna
+			values(seq_myqna_no.nextval, 
+			    #{userNo},
+			    #{type},
+			    #{title},
+			     sysDate,
+			    #{content},
+			    '답변대기'
+
+			) 
+	
+		]]>
+
+	</insert>
+	
+	
+	<!-- select mqa 가져오기  -->
+	<select id="selectmqaList" parameterType="int" resultType="com.spotmate.vo.myQnaVo">
+		<![CDATA[
+	 		select  mq.no ,
+        			mq.type,
+        			to_char(regDate, 'yy.mm.dd') regDate,
+        			mq.title,
+			        mq.content,
+			        mq.status,
+			        u.no userNo
+			from myqna mq, users u
+			where u.no = mq.userno
+			and u.no = #{userNo}
+		]]>
+		
+		</select>
+				
+	<!-- car정보 등록 -->
+	<insert id="myDriverinsert" parameterType="dlvo">
+
+		<selectKey keyProperty="carNo" resultType="int"
+			order="BEFORE">
+			select seq_car_no.nextval from dual
+		</selectKey>
+		
+		<![CDATA[
+		
+			insert into car
+			values(
+			    #{carNo},
+			    #{userNo},
+			    #{c_Model},
+			    #{c_file},
+			    #{c_num},
+			    #{c_color},
+			    #{num_PA},
+			    #{introduce}
+			) 
+	
+		]]>
+
+	</insert>
+
+
+	<!-- 카등록시 회원정보업데이트 -->
+	<update id="myDriverUpdate" parameterType="dlvo">
+	<![CDATA[
+		update  users
+	 	set 
+	 		licenseNo = #{dl},
+	 		licenseType = #{licensetype}
+	 	where no = #{userNo}
+		]]>
+	</update>
+
+
+
+	<!-- 카 옵션등록 -->
+	<insert id="carDetailInsert" parameterType="map">
+		<![CDATA[
+		
+			insert into carDetail
+			values(
+			    seq_carDetail_no.nextval,
+			    (select no from car where userno = #{userNo}),
+			    #{detailNo}
+			) 
+	
+		]]>
+
+	</insert>
+
+
+	<select id="getCarInfo" parameterType="int" resultType="dlvo">
+		<![CDATA[
+			select  c.no AS carNo,
+					c.userNo,
+					c.carName AS c_Model,
+			        c.carNo as c_num,
+			        c.carColor AS c_color,
+			        c.people as num_PA,
+			        c.introduce,
+			        u.name as username,
+			        u.birth as userBD,
+			        u.licenseNo AS dl,
+			        u.licenseType
+			from users u, car c
+			where u.no = c.userno
+			and u.no = #{userNo}
+			order by c.no desc
+			              
+		]]>
+	</select>
+	
+	
+	<!-- 유저정보수정 -->
+	<update id="userUpdate" parameterType="dlvo">
+	<![CDATA[
+		update  users
+	 	set 
+	 		name = #{username},
+	 		birth = #{userBD},
+	 		licenseNo = #{dl},
+	 		licenseType = #{licensetype}
+	 	where no = #{userNo}
+		]]>
+	</update>
+	
+	<!-- 유저정보수정 -->
+	<update id="carUpdate" parameterType="dlvo">
+	<![CDATA[
+		update  car
+	 	set 
+	 		carname = #{c_Model},
+	 		carno = #{c_num},
+	 		carpicture = #{c_file},
+	 		carcolor = #{c_color},
+	 		people = #{num_PA},
+	 		introduce = #{introduce}
+	 	where userno = #{userNo}
+		]]>
+	</update>
+	
+	<update id="carDetailDelete" parameterType="dlvo">
+	<![CDATA[
+		delete from cardetail
+	 	where carno = (select no from car where userno = #{userNo})
+		]]>
+	</update>
+	
+	
+	
+
+	
+	
+	
+	<select id="totalusercnt" parameterType="int" resultType="int">
+		select count(*) count
+		from (select type,
+				    regdate,
+				    p.fullplace,
+				    r.point,
+				    r.status
+				from spotmate s, (select regdate,
+				                        point,
+				                        mateNo,
+				                        status
+				                    from reservation
+				                    where userNo = #{userNo}
+				                    and driverNo != #{userNo}) r, (select LISTAGG(place, ',') within group (order by wayno asc) as fullPlace,
+				                                                mateNo
+				                                            from place
+				                                            group by mateNo) p
+				where s.no = r.mateNo
+				and p.mateNo = r.mateNo
+				and s.status = 'close'
+				group by type, regdate, r.point, r.status, p.fullplace, s.no
+		        order by s.no desc)
+	</select>
+	
+	<select id="getusersearchcnt" parameterType="map" resultType="int">
+		<![CDATA[
+			select count(*) count
+			from (select type,
+			            regdate,
+			            p.fullplace,
+			            r.point,
+			            r.status
+			        from spotmate s, (select to_char(regdate, 'yyyy-mm-dd hh24:mi') regdate,
+			                                point,
+			                                mateNo,
+			                                status
+			                            from reservation r
+			                            where userNo = #{userNo}
+			                            and driverNo != #{userNo}
+			                        	and status like '%'||#{usVo.status}||'%' ) r, (select LISTAGG(place, ',') within group (order by wayno asc) as fullPlace,
+									                                                        mateNo
+									                                                    from place
+									                                                    group by mateNo) p
+			where s.no = r.mateNo
+			and p.mateNo = r.mateNo
+			and s.status = 'close'
+			and regDate >= #{usVo.sdate}
+			and regDate <= #{usVo.edate}
+			and type like '%'||#{usVo.type}||'%'
+			order by s.no desc)
+        ]]>
+		        
+	</select>
+	
+	<select id="getusersearchlist" parameterType="hashmap" resultType="muVo">
+		<![CDATA[
+			select rn,
+			    type,
+			    regDate,
+			    fullplace,
+			    point,
+			    status,
+			    mateNo,
+			    resvNo
+		    from (select rownum rn,
+		        type,
+		        regdate,
+		        fullplace,
+		        point,
+		        status,
+			    mateNo,
+			    resvNo
+				from (select type,
+				    regdate,
+				    p.fullplace,
+				    r.point,
+				    r.status,
+			    	r.mateNo,
+			    	resvNo
+				from spotmate s, (select to_char(regdate, 'yyyy-mm-dd hh24:mi') regdate,
+				                        point,
+				                        mateNo,
+				                        status,
+				                        no resvNo
+				                    from reservation r
+				                    where userNo = #{userNo}
+				                    and driverNo != #{userNo}
+		                            and status like '%'||#{usVo.status}||'%'
+				                    and regDate >= #{usVo.sdate}
+				                    and regDate <= #{usVo.edate}) r, (select LISTAGG(place, ',') within group (order by wayno asc) as fullPlace,
+				                                                mateNo
+				                                            from place
+				                                            group by mateNo) p
+				where s.no = r.mateNo
+				and p.mateNo = r.mateNo
+				and s.status = 'close'
+				and type like '%'||#{usVo.type}||'%'
+				group by type, regdate, r.point, r.status, p.fullplace, s.no, r.mateNo, resvNo
+		        order by s.no desc))
+		        where rn >= #{sNum}
+				and rn <= #{eNum}
+        ]]>
+	</select>
+	
+	<select id="getuserusagelist" parameterType="map" resultType="muVo">
+		<![CDATA[
+			select rn,
+			    type,
+			    regDate,
+			    fullplace,
+			    point,
+			    status,
+			    mateNo,
+			    resvNo
+		    from (select rownum rn,
+		        type,
+		        regdate,
+		        fullplace,
+		        point,
+		        status,
+			    mateNo,
+			    resvNo
+				from (select type,
+				    regdate,
+				    p.fullplace,
+				    r.point,
+				    r.status,
+			    	r.mateNo,
+			    	resvNo
+				from spotmate s, (select to_char(regdate, 'yyyy-mm-dd hh24:mi') regdate,
+				                        point,
+				                        mateNo,
+				                        status,
+				                        no resvNo
+				                    from reservation
+				                    where userNo = #{userNo}
+				                    and driverNo != #{userNo}) r, (select LISTAGG(place, ',') within group (order by wayno asc) as fullPlace,
+				                                                mateNo
+				                                            from place
+				                                            group by mateNo) p
+				where s.no = r.mateNo
+				and p.mateNo = r.mateNo
+				and s.status = 'close'
+				group by type, regdate, r.point, r.status, p.fullplace, s.no, r.mateNo, resvNo
+		        order by s.no desc))
+		        where rn >= #{sNum}
+				and rn <= #{eNum}
+			]]>
+	</select>
+	
+	<select id="getdriverusagelist" parameterType="map" resultType="muVo">
+		<![CDATA[
+			select rn,
+			    type,
+			    regDate,
+			    fullplace,
+			    point,
+			    status,
+			    mateNo,
+			    resvNo
+		    from (select rownum rn,
+			        type,
+			        regdate,
+			        fullplace,
+			        point,
+			        status,
+			    	mateNo,
+			    	resvNo
+					from (select type,
+					    regdate,
+					    p.fullplace,
+					    r.point,
+					    r.status,
+			    		r.mateNo,
+			    		resvNo
+					from spotmate s, (select to_char(regdate, 'yyyy-mm-dd hh24:mi') regdate,
+					                        point,
+					                        mateNo,
+					                        status,
+					                        no resvNo
+					                    from reservation
+					                    where userNo = #{userNo}
+					                    and driverNo = #{userNo}) r, (select LISTAGG(place, ',') within group (order by wayno asc) as fullPlace,
+					                                                mateNo
+					                                            from place
+					                                            group by mateNo) p
+				where s.no = r.mateNo
+				and p.mateNo = r.mateNo
+				and s.status = 'close'
+				group by type, regdate, r.point, r.status, p.fullplace, s.no, r.mateNo, resvNo
+		        order by s.no desc))
+		        where rn >= #{sNum}
+				and rn <= #{eNum}
+			]]>
+	</select>
+	
+	<select id="totaldrivercnt" parameterType="int" resultType="int">
+		select count(*) count
+		from (select type,
+				    regdate,
+				    p.fullplace,
+				    r.point,
+				    r.status
+				from spotmate s, (select to_char(regdate, 'yyyy-mm-dd hh24:mi') regdate,
+				                        point,
+				                        mateNo,
+				                        status
+				                    from reservation
+				                    where userNo = #{userNo}
+				                    and driverNo = #{driverNo}) r, (select LISTAGG(place, ',') within group (order by wayno asc) as fullPlace,
+				                                                mateNo
+				                                            from place
+				                                            group by mateNo) p
+				where s.no = r.mateNo
+				and p.mateNo = r.mateNo
+				and s.status = 'close'
+				group by type, regdate, r.point, r.status, p.fullplace, s.no, r.mateNo
+		        order by s.no desc)
+	</select>
+	
+	<select id="getdriversearchcnt" parameterType="map" resultType="int">
+		<![CDATA[
+			select count(*) count
+			from (select type,
+			            regdate,
+			            p.fullplace,
+			            r.point,
+			            r.status
+			        from spotmate s, (select to_char(regdate, 'yyyy-mm-dd hh24:mi') regdate,
+			                                point,
+			                                mateNo
+			                            from reservation r
+			                            where userNo = #{userNo}
+			                            and driverNo = #{userNo}
+			                            and status like '%'||#{usVo.status}||'%' ) r, (select LISTAGG(place, ',') within group (order by wayno asc) as fullPlace,
+			                                                        mateNo
+			                                                    from place
+			                                                    group by mateNo) p
+			where s.no = r.mateNo
+			and p.mateNo = r.mateNo
+			and s.status = 'close'
+			and regDate >= #{usVo.sdate}
+			and regDate <= #{usVo.edate}
+			and type like '%'||#{usVo.type}||'%'
+			order by s.no desc)
+        ]]>
+		        
+	</select>
+	
+	<select id="getdriversearchlist" parameterType="map" resultType="muVo">
+		<![CDATA[
+			select rn,
+			    type,
+			    regDate,
+			    fullplace,
+			    point,
+			    status,
+			    mateNo,
+			    resvNo
+		    from (select rownum rn,
+		        type,
+		        regdate,
+		        fullplace,
+		        point,
+		        status,
+			    mateNo,
+			    resvNo
+				from (select type,
+				    regdate,
+				    p.fullplace,
+				    r.point,
+				    r.status,
+			    	r.mateNo,
+			    	resvNo
+				from spotmate s, (select to_char(regdate, 'yyyy-mm-dd hh24:mi') regdate,
+				                        point,
+				                        mateNo,
+				                        no
+				                    from reservation
+				                    where userNo = #{userNo}
+				                    and driverNo = #{userNo}
+		                            and status like '%'||#{usVo.status}||'%'
+				                    and regDate >= #{usVo.sdate}
+				                    and regDate <= #{usVo.edate}) r, (select LISTAGG(place, ',') within group (order by wayno asc) as fullPlace,
+						                                                mateNo
+						                                            from place
+						                                            group by mateNo) p
+				where s.no = r.mateNo
+				and p.mateNo = r.mateNo
+				and s.status = 'close'
+				and type like '%'||#{usVo.type}||'%'
+				group by type, regdate, r.point, r.status, p.fullplace, s.no, r.mateNo, resvNo
+		        order by s.no desc))
+		        where rn >= #{sNum}
+				and rn <= #{eNum}
+        ]]>
+	</select>
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	<select id="totalusercntresv" parameterType="int" resultType="int">
+		select count(*) count
+		from (select type,
+				    regdate,
+				    p.fullplace,
+				    r.point
+				from spotmate s, (select to_char(regdate, 'yyyy-mm-dd hh24:mi') regdate,
+				                        point,
+				                        mateNo
+				                    from reservation
+				                    where userNo = #{userNo}
+				                    and driverNo != #{userNo}) r, (select LISTAGG(place, ',') within group (order by wayno asc) as fullPlace,
+				                                                mateNo
+				                                            from place
+				                                            group by mateNo) p
+				where s.no = r.mateNo
+				and p.mateNo = r.mateNo
+				and s.status = 'open'
+				group by type, regdate, r.point, p.fullplace, s.no
+		        order by s.no desc)
+	</select>
+	
+	<select id="getusersearchcntresv" parameterType="map" resultType="int">
+		<choose>
+			<when test="usVo.status == ride">
+				<![CDATA[
+					select count(*) count
+					from (select type,
+					            regdate,
+					            p.fullplace,
+					            r.point
+					        from spotmate s, (select to_char(regdate, 'yyyy-mm-dd hh24:mi') regdate,
+					                                point,
+					                                mateNo
+					                            from reservation r
+					                            where userNo = #{userNo}
+					                            and driverNo != #{userNo}) r, (select LISTAGG(place, ',') within group (order by wayno asc) as fullPlace,
+					                                                        mateNo
+					                                                    from place
+					                                                    group by mateNo) p
+					where s.no = r.mateNo
+					and p.mateNo = r.mateNo
+					and s.status = 'open'
+					and s.startdate >= to_date(#{usVo.nowTime}, 'yyyy-mm-dd hh24:mi')
+					and regDate >= #{usVo.sdate}
+					and regDate <= #{usVo.edate}
+					and type like '%'||#{usVo.type}||'%'
+					order by s.no desc)
+		        ]]>
+			</when>
+			<when test="usVo.status == noRide">
+				<![CDATA[
+					select count(*) count
+					from (select type,
+					            regdate,
+					            p.fullplace,
+					            r.point
+					        from spotmate s, (select to_char(regdate, 'yyyy-mm-dd hh24:mi') regdate,
+					                                point,
+					                                mateNo
+					                            from reservation r
+					                            where userNo = #{userNo}
+					                            and driverNo != #{userNo}) r, (select LISTAGG(place, ',') within group (order by wayno asc) as fullPlace,
+					                                                        mateNo
+					                                                    from place
+					                                                    group by mateNo) p
+					where s.no = r.mateNo
+					and p.mateNo = r.mateNo
+					and s.status = 'open'
+					and s.startdate < to_date(#{usVo.nowTime}, 'yyyy-mm-dd hh24:mi')
+					and regDate >= #{usVo.sdate}
+					and regDate <= #{usVo.edate}
+					and type like '%'||#{usVo.type}||'%'
+					order by s.no desc)
+		        ]]>
+			</when>
+			<otherwise>
+				<![CDATA[
+					select count(*) count
+					from (select type,
+					            regdate,
+					            p.fullplace,
+					            r.point
+					        from spotmate s, (select to_char(regdate, 'yyyy-mm-dd hh24:mi') regdate,
+					                                point,
+					                                mateNo
+					                            from reservation r
+					                            where userNo = #{userNo}
+					                            and driverNo != #{userNo}) r, (select LISTAGG(place, ',') within group (order by wayno asc) as fullPlace,
+					                                                        mateNo
+					                                                    from place
+					                                                    group by mateNo) p
+					where s.no = r.mateNo
+					and p.mateNo = r.mateNo
+					and s.status = 'open'
+					and regDate >= #{usVo.sdate}
+					and regDate <= #{usVo.edate}
+					and type like '%'||#{usVo.type}||'%'
+					order by s.no desc)
+		        ]]>
+			</otherwise>
+		</choose>
+		        
+	</select>
+	
+	<select id="getusersearchlistresv" parameterType="hashmap" resultType="muVo">
+		<choose>
+			<when test="usVo.status == ride">
+				<![CDATA[
+					select rn,
+					    type,
+					    regDate,
+					    fullplace,
+					    point,
+					    mateNo
+				    from (select rownum rn,
+				        type,
+				        regdate,
+				        fullplace,
+				        point,
+					    mateNo
+						from (select type,
+						    regdate,
+						    p.fullplace,
+						    r.point,
+					    	r.mateNo
+						from spotmate s, (select to_char(regdate, 'yyyy-mm-dd hh24:mi') regdate,
+						                        point,
+						                        mateNo
+						                    from reservation
+						                    where userNo = #{userNo}
+						                    and driverNo != #{userNo}
+						                    and regDate >= #{usVo.sdate}
+						                    and regDate <= #{usVo.edate}) r, (select LISTAGG(place, ',') within group (order by wayno asc) as fullPlace,
+						                                                mateNo
+						                                            from place
+						                                            group by mateNo) p
+						where s.no = r.mateNo
+						and p.mateNo = r.mateNo
+						and s.status = 'open'
+						and s.startdate >= to_date(#{usVo.nowTime}, 'yyyy-mm-dd hh24:mi')
+						and type like '%'||#{usVo.type}||'%'
+						group by type, regdate, r.point, p.fullplace, s.no, r.mateNo
+				        order by s.no desc))
+				        where rn >= #{sNum}
+						and rn <= #{eNum}
+		        ]]>
+	        </when>
+	        <when test="usVo.status == noRide">
+	        	<![CDATA[
+					select rn,
+					    type,
+					    regDate,
+					    fullplace,
+					    point,
+					    mateNo
+				    from (select rownum rn,
+				        type,
+				        regdate,
+				        fullplace,
+				        point,
+					    mateNo
+						from (select type,
+						    regdate,
+						    p.fullplace,
+						    r.point,
+					    	r.mateNo
+						from spotmate s, (select to_char(regdate, 'yyyy-mm-dd hh24:mi') regdate,
+						                        point,
+						                        mateNo
+						                    from reservation
+						                    where userNo = #{userNo}
+						                    and driverNo != #{userNo}
+						                    and regDate >= #{usVo.sdate}
+						                    and regDate <= #{usVo.edate}) r, (select LISTAGG(place, ',') within group (order by wayno asc) as fullPlace,
+						                                                mateNo
+						                                            from place
+						                                            group by mateNo) p
+						where s.no = r.mateNo
+						and p.mateNo = r.mateNo
+						and s.status = 'open'
+						and s.startdate < to_date(#{usVo.nowTime}, 'yyyy-mm-dd hh24:mi')
+						and type like '%'||#{usVo.type}||'%'
+						group by type, regdate, r.point, p.fullplace, s.no, r.mateNo
+				        order by s.no desc))
+				        where rn >= #{sNum}
+						and rn <= #{eNum}
+		        ]]>
+	        </when>
+	        <otherwise>
+	        	<![CDATA[
+					select rn,
+					    type,
+					    regDate,
+					    fullplace,
+					    point,
+					    mateNo,
+					    startdate
+				    from (select rownum rn,
+				        type,
+				        regdate,
+				        fullplace,
+				        point,
+					    mateNo,
+					    startdate
+						from (select type,
+						    regdate,
+						    p.fullplace,
+						    r.point,
+					    	r.mateNo,
+					    	to_char(startdate, 'yyyy-mm-dd hh24:mi') startdate
+						from spotmate s, (select to_char(regdate, 'yyyy-mm-dd hh24:mi') regdate,
+						                        point,
+						                        mateNo
+						                    from reservation
+						                    where userNo = #{userNo}
+						                    and driverNo != #{userNo}
+						                    and regDate >= #{usVo.sdate}
+						                    and regDate <= #{usVo.edate}) r, (select LISTAGG(place, ',') within group (order by wayno asc) as fullPlace,
+						                                                mateNo
+						                                            from place
+						                                            group by mateNo) p
+						where s.no = r.mateNo
+						and p.mateNo = r.mateNo
+						and s.status = 'open'
+						and type like '%'||#{usVo.type}||'%'
+						group by type, regdate, r.point, startdate, p.fullplace, s.no, r.mateNo
+				        order by s.no desc))
+				        where rn >= #{sNum}
+						and rn <= #{eNum}
+		        ]]>
+	        </otherwise>
+        </choose>
+	</select>
+	
+	<select id="getuserlistresv" parameterType="map" resultType="muVo">
+		<![CDATA[
+			select rn,
+			    type,
+			    regDate,
+			    fullplace,
+			    point,
+			    mateNo,
+			    startdate
+		    from (select rownum rn,
+		        type,
+		        regdate,
+		        fullplace,
+		        point,
+			    mateNo,
+			    startdate
+				from (select type,
+				  	regdate,
+				    p.fullplace,
+				    r.point,
+			    	r.mateNo,
+			    	to_char(startdate, 'yyyy-mm-dd hh24:mi') startdate
+   					from spotmate s, (select to_char(regdate, 'yyyy-mm-dd hh24:mi') regdate,
+				                        point,
+				                        mateNo
+				                    from reservation
+				                    where userNo = #{userNo}
+				                    and driverNo != #{userNo}) r, (select LISTAGG(place, ',') within group (order by wayno asc) as fullPlace,
+				                                                mateNo
+				                                            from place
+				                                            group by mateNo) p
+				where s.no = r.mateNo
+				and p.mateNo = r.mateNo
+				and s.status = 'open'
+				group by type, regdate, r.point, startdate, p.fullplace, s.no, r.mateNo
+		        order by s.no desc))
+		        where rn >= #{sNum}
+				and rn <= #{eNum}
+			]]>
+	</select>
+	
+	<select id="getdriverlistresv" parameterType="map" resultType="muVo">
+		<![CDATA[
+			select rn,
+			    type,
+			    regDate,
+			    fullplace,
+			    point,
+			    mateNo,
+			    startdate
+		    from (select rownum rn,
+			        type,
+			        regdate,
+			        fullplace,
+			        point,
+			    	mateNo,
+			    	startdate
+					from (select type,
+					    regdate,
+					    p.fullplace,
+					    r.point,
+			    		r.mateNo,
+			    		to_char(startdate, 'yyyy-mm-dd hh24:mi') startdate
+					from spotmate s, (select to_char(regdate, 'yyyy-mm-dd hh24:mi') regdate,
+					                        point,
+					                        mateNo
+					                    from reservation
+					                    where userNo = #{userNo}
+					                    and driverNo = #{userNo}) r, (select LISTAGG(place, ',') within group (order by wayno asc) as fullPlace,
+					                                                mateNo
+					                                            from place
+					                                            group by mateNo) p
+				where s.no = r.mateNo
+				and p.mateNo = r.mateNo
+				and s.status = 'open'
+				group by type, regdate, r.point, startdate, p.fullplace, s.no, r.mateNo
+		        order by s.no desc))
+		        where rn >= #{sNum}
+				and rn <= #{eNum}
+			]]>
+	</select>
+	
+	<select id="totaldrivercntresv" parameterType="int" resultType="int">
+		select count(*) count
+		from (select type,
+				    regdate,
+				    p.fullplace,
+				    r.point,
+				    status
+				from spotmate s, (select to_char(regdate, 'yyyy-mm-dd hh24:mi') regdate,
+				                        point,
+				                        mateNo
+				                    from reservation
+				                    where userNo = #{userNo}
+				                    and driverNo = #{driverNo}) r, (select LISTAGG(place, ',') within group (order by wayno asc) as fullPlace,
+				                                                mateNo
+				                                            from place
+				                                            group by mateNo) p
+				where s.no = r.mateNo
+				and p.mateNo = r.mateNo
+				and s.status = 'open'
+				group by type, regdate, r.point, status, p.fullplace, s.no, r.mateNo
+		        order by s.no desc)
+	</select>
+	
+	<select id="getdriversearchcntresv" parameterType="map" resultType="int">
+		<choose>
+			<when test="usVo.status == ride">
+				<![CDATA[
+					select count(*) count
+					from (select type,
+					            regdate,
+					            p.fullplace,
+					            r.point,
+					            status
+					        from spotmate s, (select to_char(regdate, 'yyyy-mm-dd hh24:mi') regdate,
+					                                point,
+					                                mateNo
+					                            from reservation r
+					                            where userNo = #{userNo}
+					                            and driverNo = #{userNo}) r, (select LISTAGG(place, ',') within group (order by wayno asc) as fullPlace,
+					                                                        mateNo
+					                                                    from place
+					                                                    group by mateNo) p
+					where s.no = r.mateNo
+					and p.mateNo = r.mateNo
+					and s.status = 'open'
+					and s.startdate >= to_date(#{usVo.nowTime}, 'yyyy-mm-dd hh24:mi')
+					and regDate >= #{usVo.sdate}
+					and regDate <= #{usVo.edate}
+					and type like '%'||#{usVo.type}||'%'
+					order by s.no desc)
+		        ]]>
+			</when>
+			<when test="usVo.status == noRide">
+				<![CDATA[
+					select count(*) count
+					from (select type,
+					            regdate,
+					            p.fullplace,
+					            r.point,
+					            status
+					        from spotmate s, (select to_char(regdate, 'yyyy-mm-dd hh24:mi') regdate,
+					                                point,
+					                                mateNo
+					                            from reservation r
+					                            where userNo = #{userNo}
+					                            and driverNo = #{userNo}) r, (select LISTAGG(place, ',') within group (order by wayno asc) as fullPlace,
+					                                                        mateNo
+					                                                    from place
+					                                                    group by mateNo) p
+					where s.no = r.mateNo
+					and p.mateNo = r.mateNo
+					and s.status = 'open'
+					and s.startdate < to_date(#{usVo.nowTime}, 'yyyy-mm-dd hh24:mi')
+					and regDate >= #{usVo.sdate}
+					and regDate <= #{usVo.edate}
+					and type like '%'||#{usVo.type}||'%'
+					order by s.no desc)
+		        ]]>
+			</when>
+			<otherwise>
+				<![CDATA[
+					select count(*) count
+					from (select type,
+					            regdate,
+					            p.fullplace,
+					            r.point,
+					            status
+					        from spotmate s, (select to_char(regdate, 'yyyy-mm-dd hh24:mi') regdate,
+					                                point,
+					                                mateNo
+					                            from reservation r
+					                            where userNo = #{userNo}
+					                            and driverNo = #{userNo}) r, (select LISTAGG(place, ',') within group (order by wayno asc) as fullPlace,
+					                                                        mateNo
+					                                                    from place
+					                                                    group by mateNo) p
+					where s.no = r.mateNo
+					and p.mateNo = r.mateNo
+					and s.status = 'open'
+					and regDate >= #{usVo.sdate}
+					and regDate <= #{usVo.edate}
+					and type like '%'||#{usVo.type}||'%'
+					order by s.no desc)
+		        ]]>
+			</otherwise>
+		</choose>
+		        
+	</select>
+	
+	<select id="getdriversearchlistresv" parameterType="map" resultType="muVo">
+		<choose>
+			<when test="usVo.status == ride">
+				<![CDATA[
+					select rn,
+					    type,
+					    regDate,
+					    fullplace,
+					    point,
+					    mateNo
+				    from (select rownum rn,
+				        type,
+				        regdate,
+				        fullplace,
+				        point,
+					    mateNo
+						from (select type,
+						    regdate,
+						    p.fullplace,
+						    r.point,
+					    	r.mateNo
+						from spotmate s, (select to_char(regdate, 'yyyy-mm-dd hh24:mi') regdate,
+						                        point,
+						                        mateNo
+						                    from reservation
+						                    where userNo = #{userNo}
+						                    and driverNo = #{userNo}
+						                    and regDate >= #{usVo.sdate}
+						                    and regDate <= #{usVo.edate}) r, (select LISTAGG(place, ',') within group (order by wayno asc) as fullPlace,
+						                                                mateNo
+						                                            from place
+						                                            group by mateNo) p
+						where s.no = r.mateNo
+						and p.mateNo = r.mateNo
+						and s.status = 'open'
+						and s.startdate >= to_date(#{usVo.nowTime}, 'yyyy-mm-dd hh24:mi')
+						and type like '%'||#{usVo.type}||'%'
+						group by type, regdate, r.point, p.fullplace, s.no, r.mateNo
+				        order by s.no desc))
+				        where rn >= #{sNum}
+						and rn <= #{eNum}
+		        ]]>
+	        </when>
+	        <when test="usVo.status == noRide">
+	        	<![CDATA[
+					select rn,
+					    type,
+					    regDate,
+					    fullplace,
+					    point,
+					    mateNo
+				    from (select rownum rn,
+				        type,
+				        regdate,
+				        fullplace,
+				        point,
+					    mateNo
+						from (select type,
+						    regdate,
+						    p.fullplace,
+						    r.point,
+					    	r.mateNo
+						from spotmate s, (select to_char(regdate, 'yyyy-mm-dd hh24:mi') regdate,
+						                        point,
+						                        mateNo
+						                    from reservation
+						                    where userNo = #{userNo}
+						                    and driverNo = #{userNo}
+						                    and regDate >= #{usVo.sdate}
+						                    and regDate <= #{usVo.edate}) r, (select LISTAGG(place, ',') within group (order by wayno asc) as fullPlace,
+						                                                mateNo
+						                                            from place
+						                                            group by mateNo) p
+						where s.no = r.mateNo
+						and p.mateNo = r.mateNo
+						and s.status = 'open'
+						and s.startdate < to_date(#{usVo.nowTime}, 'yyyy-mm-dd hh24:mi')
+						and type like '%'||#{usVo.type}||'%'
+						group by type, regdate, r.point, p.fullplace, s.no, r.mateNo
+				        order by s.no desc))
+				        where rn >= #{sNum}
+						and rn <= #{eNum}
+		        ]]>
+	        </when>
+	        <otherwise>
+	        	<![CDATA[
+					select rn,
+					    type,
+					    regDate,
+					    fullplace,
+					    point,
+					    mateNo,
+					    startdate
+				    from (select rownum rn,
+				        type,
+				        regdate,
+				        fullplace,
+				        point,
+					    mateNo,
+					    startdate
+						from (select type,
+						    regdate,
+						    p.fullplace,
+						    r.point,
+					    	r.mateNo,
+					    	to_char(startdate, 'yyyy-mm-dd hh24:mi') startdate
+						from spotmate s, (select to_char(regdate, 'yyyy-mm-dd hh24:mi') regdate,
+						                        point,
+						                        mateNo
+						                    from reservation
+						                    where userNo = #{userNo}
+						                    and driverNo = #{userNo}
+						                    and regDate >= #{usVo.sdate}
+						                    and regDate <= #{usVo.edate}) r, (select LISTAGG(place, ',') within group (order by wayno asc) as fullPlace,
+						                                                mateNo
+						                                            from place
+						                                            group by mateNo) p
+						where s.no = r.mateNo
+						and p.mateNo = r.mateNo
+						and s.status = 'open'
+						and type like '%'||#{usVo.type}||'%'
+						group by type, regdate, r.point, startdate, p.fullplace, s.no, r.mateNo
+				        order by s.no desc))
+				        where rn >= #{sNum}
+						and rn <= #{eNum}
+		        ]]>
+	        </otherwise>
+        </choose>
+	</select>
+	
+	<select id="getMateNoByResvNo" parameterType="int" resultType="int">
+		select  mateNo
+		from reservation
+		where no = #{resvNo}
+	</select>
+	
+	<select id="forReviewInfo" parameterType="map" resultType="riVo">
+		select listagg(place, ',') within group(order by wayno) fullPlace,
+		    r.people,
+		    to_char(startdate, 'am hh:mm') startTime,
+		    r.point,
+		    duration,
+		    distance,
+		    r.no resvNo
+		from spotmate s, place p, reservation r
+		where s.no = #{mateNo}
+		and r.no = #{resvNo}
+		and s.no = p.mateno
+		and s.no = r.mateno
+		group by r.people, startdate, r.point, duration, distance, r.no
+	</select>
+	
+	<insert id="insertUserReview" parameterType="rVo">
+		insert into userReview
+		values(
+			seq_userReview_no.nextval,
+			#{resvNo},
+			#{star},
+			#{content}
+		)
+	</insert>
+	
+	<update id="afterInsertUserReview" parameterType="int">
+		update reservation
+		set status = 'close'
+		where no = #{resvNo}
+	</update>
+	
+	
+	<select id="getPassengerList" parameterType="map" resultType="map">
+		select userNo,
+			name
+		from reservation r, users u
+		where mateNo = #{mateNo}
+		and userNo = u.no
+		and userNo != #{userNo}
+		order by userNo asc
+	</select>
+	
+	<insert id="insertDriverReview" parameterType="rVo">
+		insert into driverReview
+		values(
+			seq_driverReview_no.nextval,
+			#{resvNo},
+			#{userNo},
+			#{star}
+		)
+	</insert>
+	
+	<update id="afterInsertDriverReview" parameterType="int">
+		update reservation
+		set status = 'close'
+		where no = #{resvNo}
+	</update>
+	
+	<select id="getReviewedPassengerList" parameterType="int" resultType="int">
+		select userNo
+		from driverReview
+		where resvNo = #{resvNo}
+		order by userNo asc
+	</select>
+	
+	<update id="endResv" parameterType="map">
+		update spotmate
+		set status = 'close'
+		where carNo = #{userNo}
+		and no = #{mateNo}
+	</update>
+	
+	<select id="getResvNo" parameterType="map" resultType="int">
+		select no
+		from reservation
+		where userNo = #{userNo}
+		and mateNo = #{mateNo}
+	</select>
+	
+	<insert id="driverGetPoint" parameterType="rVo">
+		<selectKey keyProperty="point" resultType="int" order="BEFORE">
+				select point
+				from spotmate
+				where no = #{mateNo}
+		</selectKey>
+	
+		insert into pointUsage
+		values(
+			seq_pointusage_no.nextval,
+			#{userNo},
+			'완료',
+			sysdate,
+			'',
+			#{point},
+			#{resvNo}
+		)
+	</insert>
+	
+	<select id="getReview" parameterType="map" resultType="map">
+		select star,
+		    content
+		from userReview ur, reservation r, users u
+		where ur.resvno = r.no
+		and u.no = r.userNo
+		and r.userNo = #{userNo}
+		and ur.resvNo = #{resvNo}
+	</select>
+	
+	<select id="getDriverReview" parameterType="map" resultType="double">
+		select star
+		from driverReview
+		where resvNo = #{resvNo}
+		and userNo = #{userNo}
+	</select>
+
+</mapper>
